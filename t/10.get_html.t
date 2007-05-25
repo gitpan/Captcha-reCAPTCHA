@@ -49,12 +49,13 @@ BEGIN {
               . qq{value="manual_challenge" /></noscript>}
         },
     );
-    plan tests => 2 * @schedule;
+    plan tests => 3 * @schedule;
 }
 
 for my $test ( @schedule ) {
     my $name = $test->{name};
     ok my $captcha = Captcha::reCAPTCHA->new(), "$name: Created OK";
+    isa_ok $captcha, 'Captcha::reCAPTCHA';
     my $args = $test->{args};
     my $html = $captcha->get_html( @$args );
     is $html, $test->{expect}, "$name: Generate HTML OK";

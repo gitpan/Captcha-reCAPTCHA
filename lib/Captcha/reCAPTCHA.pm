@@ -5,7 +5,7 @@ use strict;
 use Carp;
 use LWP::UserAgent;
 
-use version; our $VERSION = qv( '0.1' );
+use version; our $VERSION = qv( '0.2' );
 
 use constant API_SERVER        => 'http://api.recaptcha.net';
 use constant API_SECURE_SERVER => 'https://api-secure.recaptcha.net';
@@ -181,7 +181,7 @@ Captcha::reCAPTCHA - A Perl implentation of the reCAPTCHA API
 
 =head1 VERSION
 
-This document describes Captcha::reCAPTCHA version 0.1
+This document describes Captcha::reCAPTCHA version 0.2
 
 =head1 SYNOPSIS
 
@@ -306,28 +306,6 @@ and C<error>.
     }
 
 See the /examples subdirectory for examples of how to call C<check_answer>.
-
-=back
-
-=head1 DIAGNOSTICS
-
-=for author to fill in:
-    List every single error and warning message that the module can
-    generate (even the ones that will "never happen"), with a full
-    explanation of each problem, one or more likely causes, and any
-    suggested remedies.
-
-=over
-
-=item C<< Error message here, perhaps with %s placeholders >>
-
-[Description of error here]
-
-=item C<< Another error message here >>
-
-[Description of error here]
-
-[Et cetera, et cetera]
 
 =back
 
