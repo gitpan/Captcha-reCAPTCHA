@@ -4,12 +4,15 @@ use warnings;
 use strict;
 use Carp;
 use LWP::UserAgent;
+use Crypt::Rijndael;
+use MIME::Base64;
 
-use version; our $VERSION = qv( '0.2' );
+use version; our $VERSION = qv( '0.4' );
 
-use constant API_SERVER        => 'http://api.recaptcha.net';
-use constant API_SECURE_SERVER => 'https://api-secure.recaptcha.net';
-use constant API_VERIFY_SERVER => 'http://api-verify.recaptcha.net';
+use constant API_SERVER          => 'http://api.recaptcha.net';
+use constant API_SECURE_SERVER   => 'https://api-secure.recaptcha.net';
+use constant API_VERIFY_SERVER   => 'http://api-verify.recaptcha.net';
+use constant API_MAILHIDE_SERVER => 'http://mailhide.recaptcha.net';
 
 sub new {
     my $class = shift;
@@ -24,8 +27,12 @@ sub _initialize {
 
     croak "new must be called with a reference to a hash of parameters"
       unless 'HASH' eq ref $args;
+}
 
-    $self->{ua} = LWP::UserAgent->new();
+sub _get_ua {
+    my $self = shift;
+    $self->{ua} ||= LWP::UserAgent->new();
+    return $self->{ua};
 }
 
 sub _encode_url {
@@ -75,9 +82,8 @@ sub get_html {
     my $self = shift;
     my ( $pubkey, $error, $use_ssl ) = @_;
 
-    croak "To use reCAPTCHA you must get an API key from "
-      . "<a href='http:/ / recaptcha
-      . net / api / getkey '>http://recaptcha.net/api/getkey</a>"
+    croak
+      "To use reCAPTCHA you must get an API key from http://recaptcha.net/api/getkey"
       unless $pubkey;
 
     my $server = $use_ssl ? API_SECURE_SERVER : API_SERVER;
@@ -128,10 +134,9 @@ sub get_html {
 
 sub _post_request {
     my $self = shift;
-    my $url  = shift;
-    my $args = shift;
+    my ( $url, $args ) = @_;
 
-    return $self->{ua}->post( $url, $args );
+    return $self->_get_ua->post( $url, $args );
 }
 
 sub check_answer {
@@ -139,7 +144,7 @@ sub check_answer {
     my ( $privkey, $remoteip, $challenge, $response ) = @_;
 
     croak
-      "To use reCAPTCHA you must get an API key from <a href='http://recaptcha.net/api/getkey'>http://recaptcha.net/api/getkey</a>"
+      "To use reCAPTCHA you must get an API key from http://recaptcha.net/api/getkey"
       unless $privkey;
 
     croak "For security reasons, you must pass the remote ip to reCAPTCHA"
@@ -168,8 +173,96 @@ sub check_answer {
         }
     }
     else {
+
+        # TODO: Find out whether there's a proper code for a
+        # server error.
         return { is_valid => 0, error => 'server-error' };
     }
+}
+
+sub _aes_encrypt {
+    my ( $val, $ky ) = @_;
+
+    my $val_len = length( $val );
+    my $pad_len = int( ( $val_len + 15 ) / 16 ) * 16;
+
+    # Pad value
+    $val .= chr( 16 - $val_len % 16 ) x ( $pad_len - $val_len )
+      if $val_len < $pad_len;
+
+    my $cipher = Crypt::Rijndael->new( $ky, Crypt::Rijndael::MODE_CBC );
+    $cipher->set_iv( "\0" x 16 );
+
+    return $cipher->encrypt( $val );
+}
+
+sub _urlbase64 {
+    my $str = shift;
+    chomp (my $enc = encode_base64( $str ));
+    $enc =~ tr{+/}{-_};
+    return $enc;
+}
+
+sub mailhide_url {
+    my $self = shift;
+    my ( $pubkey, $privkey, $email ) = @_;
+
+    croak "To use reCAPTCHA Mailhide, you have to sign up for a public and "
+      . "private key, you can do so at http://mailhide.recaptcha.net/apikey"
+      unless $pubkey && $privkey;
+
+    return API_MAILHIDE_SERVER . '/d?'
+      . _encode_query(
+        {
+            k => $pubkey,
+            c => _urlbase64( _aes_encrypt( $email, pack( 'H*', $privkey ) ) )
+        }
+      );
+}
+
+sub _email_parts {
+    my ( $user, $dom ) = split( /\@/, shift, 2 );
+    my $ul = length( $user );
+    return ( substr( $user, 0, $ul <= 4 ? 1 : $ul <= 6 ? 3 : 4 ), $dom );
+}
+
+sub mailhide_html {
+    my $self = shift;
+    my ( $pubkey, $privkey, $email ) = @_;
+
+    my ( $user, $dom ) = _email_parts( $email );
+    my $url = $self->mailhide_url( $pubkey, $privkey, $email );
+
+    my %window_style = (
+        toolbar    => 0,
+        scrollbars => 0,
+        location   => 0,
+        statusbar  => 0,
+        menubar    => 0,
+        resizable  => 0,
+        width      => 500,
+        height     => 300
+    );
+
+    my $style = join ',',
+      map { "$_=$window_style{$_}" } sort keys %window_style;
+
+    return join(
+        '',
+        _encode_entity( $user ),
+        _open_tag(
+            'a',
+            {
+                href    => $url,
+                onclick => "window.open('$url', '', '$style'); return false;",
+                title   => 'Reveal this e-mail address'
+            }
+        ),
+        '...',
+        _close_tag( 'a' ),
+        '@',
+        _encode_entity( $dom )
+    );
 }
 
 1;
@@ -177,11 +270,11 @@ __END__
 
 =head1 NAME
 
-Captcha::reCAPTCHA - A Perl implentation of the reCAPTCHA API
+Captcha::reCAPTCHA - A Perl implementation of the reCAPTCHA API
 
 =head1 VERSION
 
-This document describes Captcha::reCAPTCHA version 0.2
+This document describes Captcha::reCAPTCHA version 0.4
 
 =head1 SYNOPSIS
 
@@ -207,7 +300,7 @@ This document describes Captcha::reCAPTCHA version 0.2
     }
 
 For complete examples see the /examples subdirectory
-    
+
 =head1 DESCRIPTION
 
 reCAPTCHA is a hybrid mechanical turk and captcha that allows visitors
@@ -222,11 +315,12 @@ From L<http://recaptcha.net/learnmore.html>:
     possible because most OCR programs alert you when a word cannot be read
     correctly.
 
-This is a Perl implementation of the PHP interface that can be found here:
+This Perl implementation is modelled on the PHP interface that can be
+found here:
 
 L<http://recaptcha.net/plugins/php/>
 
-=head1 INTERFACE 
+=head1 INTERFACE
 
 =over
 
@@ -234,9 +328,21 @@ L<http://recaptcha.net/plugins/php/>
 
 Create a new C<< Captcha::reCAPTCHA >>.
 
+=back
+
+=head2 reCAPTCHA
+
+To use reCAPTCHA you need to register your site here:
+
+L<https://admin.recaptcha.net/recaptcha/createsite/>
+
+=over
+
 =item C<< get_html( $pubkey, $error, $use_ssl ) >>
 
 Generates HTML to display the captcha.
+
+    print $captcha->get_html( $PUB, $err );
 
 =over
 
@@ -244,16 +350,16 @@ Generates HTML to display the captcha.
 
 Your reCAPTCHA public key, from the API Signup Page
 
-=item C<< $use_ssl >>
-
-Should the SSL-based API be used? If you are displaying a page to the
-user over SSL, be sure to set this to true so an error dialog doesn't
-come up in the user's browser.
-
 =item C<< $error >>
 
-If this string is set, the reCAPTCHA area will display the error code
+Optional. If this string is set, the reCAPTCHA area will display the error code
 given. This error code comes from $response->{error}.
+
+=item C<< $use_ssl >>
+
+Optional. Should the SSL-based API be used? If you are displaying a page
+to the user over SSL, be sure to set this to true so an error dialog
+doesn't come up in the user's browser.
 
 =back
 
@@ -309,10 +415,71 @@ See the /examples subdirectory for examples of how to call C<check_answer>.
 
 =back
 
+=head2 reCAPTCHA Mailhide
+
+To use reCAPTCHA Mailhide you need to get a public, private key pair
+from this page:
+
+L<http://mailhide.recaptcha.net/apikey>
+
+The Mailhide API consists of two methods C<< mailhide_html >>
+and C<< mailhide_url >>. The methods have the same parameters.
+
+The _html version returns HTML that can be directly put on your web
+page. The username portion of the email that is passed in is
+truncated and replaced with a link that calls Mailhide. The _url
+version gives you the url to decode the email and leaves it up to you
+to place the email in HTML.
+
+=over
+
+=item C<< mailhide_url( $pubkey, $privkey, $email ) >>
+
+Generate a link that will decode the specified email address.
+
+=over
+
+=item C<< $pubkey >>
+
+The Mailhide public key from the signup page
+
+=item C<< $privkey >>
+
+The Mailhide private key from the signup page
+
+=item C<< $email >>
+
+The email address you want to hide.
+
+=back
+
+Returns a URL that when clicked will allow the user to decode the hidden
+email address.
+
+=item C<< mailhide_html( $pubkey, $privkey, $email ) >>
+
+Generates HTML markup to embed a Mailhide protected email address
+on a page.
+
+The arguments are the same as for C<mailhide_url>.
+
+Returns a string containing HTML that may be embedded directly in
+a web page.
+
+=back
+
 =head1 CONFIGURATION AND ENVIRONMENT
 
 Captcha::reCAPTCHA requires no configuration files or environment
 variables.
+
+To use reCAPTCHA sign up for a key pair here:
+
+L<https://admin.recaptcha.net/recaptcha/createsite/>
+
+To use Mailhide get a public/private key pair here:
+
+L<http://mailhide.recaptcha.net/apikey>
 
 =head1 DEPENDENCIES
 

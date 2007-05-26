@@ -6,8 +6,15 @@ use warnings;
 use Captcha::reCAPTCHA;
 use CGI::Simple;
 
-use constant PUBLIC_KEY  => '<public key here>';
-use constant PRIVATE_KEY => '<private key here>';
+# Your reCAPTCHA keys from
+#   https://admin.recaptcha.net/recaptcha/createsite/
+use constant PUBLIC_KEY       => '<public key here>';
+use constant PRIVATE_KEY      => '<private key here>';
+
+# Your reCAPTCHA mailhide keys from 
+#   http://mailhide.recaptcha.net/apikey
+use constant MAIL_PUBLIC_KEY  => '<public mailhide key here>';
+use constant MAIL_PRIVATE_KEY => '<private mailhide key here>';
 
 $| = 1;
 
@@ -23,6 +30,7 @@ print <<EOT;
     <form action="" method="post">
 EOT
 
+# Check response
 if ( $q->param( 'recaptcha_response_field' ) ) {
     my $result = $c->check_answer(
         PRIVATE_KEY, $ENV{'REMOTE_ADDR'},
@@ -38,12 +46,20 @@ if ( $q->param( 'recaptcha_response_field' ) ) {
     }
 }
 
+# Generate the form
 print $c->get_html( PUBLIC_KEY, $error );
 
 print <<EOT;
     <br/>
     <input type="submit" value="submit" />
     </form>
+EOT
+
+# Output a protected email address
+print "<p>Mail ",
+  $c->mailhide_html( MAIL_PUBLIC_KEY, MAIL_PRIVATE_KEY, 'someone@example.com' ), "</p>\n";
+
+print <<EOT;
   </body>
 </html>
 EOT

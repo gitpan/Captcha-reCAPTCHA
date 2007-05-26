@@ -2,5 +2,13 @@ Revision history for Captcha-reCAPTCHA
 
 0.1 2007-05-25
     Initial release.
+
 0.2 2007-05-25
     Added t/20.check_answer.t, minor doc fixes.
+
+0.3 2007-05-26
+    Minor doc fixes
+
+0.4 2007-05-26
+    Made LWP::UserAgent creation lazy
+    

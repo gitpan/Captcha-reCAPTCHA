@@ -1,4 +1,4 @@
-Captcha-reCAPTCHA version 0.2
+Captcha-reCAPTCHA version 0.4
 
 INSTALLATION
 
@@ -13,6 +13,8 @@ To install this module, run the following commands:
 DEPENDENCIES
 
 LWP::UserAgent
+Crypt::Rijndael
+MIME::Base64
 
 COPYRIGHT AND LICENCE
 
