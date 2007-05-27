@@ -7,12 +7,55 @@ use LWP::UserAgent;
 use Crypt::Rijndael;
 use MIME::Base64;
 
-use version; our $VERSION = qv( '0.4' );
+use version; our $VERSION = qv( '0.5' );
 
 use constant API_SERVER          => 'http://api.recaptcha.net';
 use constant API_SECURE_SERVER   => 'https://api-secure.recaptcha.net';
 use constant API_VERIFY_SERVER   => 'http://api-verify.recaptcha.net';
 use constant API_MAILHIDE_SERVER => 'http://mailhide.recaptcha.net';
+
+# TODO: Find out whether there's a proper code for a server error.
+use constant SERVER_ERROR => 'server-error';
+
+# Validation rules for keys - used to produce better diagnostics in the
+# case where people use the wrong key
+
+my %VALID_KEY = (
+    MAIN_KEY => {
+        match => qr/^ [A-Z0-9_-]{40} $/xi,
+        desc  => 'reCAPCTHA key'
+    },
+    MAILHIDE_PUBLIC => {
+        match => qr/^ [A-Z0-9_-]{24} == $/xi,
+        desc  => 'Mailhide public key'
+    },
+    MAILHIDE_PRIVATE => {
+        match => qr/^ [A-F0-9]{32} $/xi,
+        desc  => 'Mailhide private key'
+    }
+);
+
+my %ENT_MAP = (
+    '&' => '&amp;',
+    '<' => '&lt;',
+    '>' => '&gt;',
+    '"' => '&quot;',
+    "'" => '&apos;',
+);
+
+my %JSON_ESCAPE = (
+    '"'  => '\"',
+    "\n" => '\n',
+);
+
+sub _hash_re {
+    my $hash = shift;
+    my $match = join( '|', map quotemeta, sort keys %$hash );
+    return qr/($match)/;
+}
+
+my $ENT_RE  = _hash_re( \%ENT_MAP );
+my $JSON_RE = _hash_re( \%JSON_ESCAPE );
 
 sub new {
     my $class = shift;
@@ -29,18 +72,49 @@ sub _initialize {
       unless 'HASH' eq ref $args;
 }
 
+sub _guess_key_type {
+    my $key = shift;
+    for my $kt ( keys %VALID_KEY ) {
+        my $kd = $VALID_KEY{$kt};
+        return ( $kt, $kd->{desc} )
+          if $key =~ $kd->{match};
+    }
+    return;
+}
+
+sub _check_key {
+    my ( $type, $key ) = @_;
+    my $kd = $VALID_KEY{$type} || croak "Invalid key type: $type";
+    return $key if $key =~ $kd->{match};
+    if ( my ( $guess, $desc ) = _guess_key_type( $key ) ) {
+        croak "Expected a "
+          . $kd->{desc}
+          . ". The supplied key looks like a "
+          . $desc;
+    }
+    else {
+        croak "Expected a "
+          . $kd->{desc}
+          . ". The supplied key should match "
+          . $kd->{match};
+    }
+}
+
+# Get a UA singleton
 sub _get_ua {
     my $self = shift;
     $self->{ua} ||= LWP::UserAgent->new();
     return $self->{ua};
 }
 
+# URL encode a string
 sub _encode_url {
     my $str = shift;
     $str =~ s/([^A-Za-z0-9_])/$1 eq ' ' ? '+' : sprintf("%%%02x", ord($1))/eg;
     return $str;
 }
 
+# Turn a hash reference into a query string.
 sub _encode_query {
     my $hash = shift || {};
     return join '&',
@@ -48,19 +122,14 @@ sub _encode_query {
       sort keys %$hash;
 }
 
+# (X)HTML entity encode a string
 sub _encode_entity {
-    my $str     = shift;
-    my %ent_map = (
-        '&' => '&amp;',
-        '<' => '&lt;',
-        '>' => '&gt;',
-        '"' => '&quot;',
-        "'" => '&apos;'
-    );
-    $str =~ s/([&<>'"])/$ent_map{$1}/eg;
+    my $str = shift;
+    $str =~ s/$ENT_RE/$ENT_MAP{$1}/eg;
     return $str;
 }
 
+# Generate an opening (X)HTML tag
 sub _open_tag {
     my $name   = shift;
     my $attr   = shift || {};
@@ -73,18 +142,64 @@ sub _open_tag {
       . ( $closed ? ' />' : '>' );
 }
 
+# Generate a closing (X)HTML tag
 sub _close_tag {
     my $name = shift;
     return "</$name>";
 }
 
+# Minimal JSON encoder
+sub _json_lite {
+    my $obj = shift;
+    if ( my $type = ref $obj ) {
+        if ( 'HASH' eq $type ) {
+            return '{'
+              . join( ',',
+                map { _json_lite( $_ ) . ':' . _json_lite( $obj->{$_} ) }
+                  sort keys %$obj )
+              . '}';
+        }
+        elsif ( 'ARRAY' eq $type ) {
+            return '[' . join( ',', map { _json_lite( $_ ) } @$obj ) . ']';
+        }
+        else {
+            croak "Can't convert a $type to JSON";
+        }
+    }
+    else {
+        if ( $obj =~ /^-?\d+(?:[.]\d+)?$/ ) {
+            return $obj;
+        }
+        else {
+            $obj =~ s/$JSON_RE/$JSON_ESCAPE{$1}/eg;
+            return '"' . $obj . '"';
+        }
+    }
+}
+
+sub get_options_setter {
+    my $self = shift;
+    my $options = shift || return '';
+    return join( '',
+        _open_tag( 'script', { type => 'text/javascript' } ),
+        "\n//<![CDATA[\n",
+        "var RecaptchaOptions = ",
+        _json_lite( $options ),
+        ";\n",
+        "//]]>\n",
+        _close_tag( 'script' ),
+        "\n" );
+}
+
 sub get_html {
     my $self = shift;
-    my ( $pubkey, $error, $use_ssl ) = @_;
+    my ( $pubkey, $error, $use_ssl, $options ) = @_;
 
     croak
       "To use reCAPTCHA you must get an API key from http://recaptcha.net/api/getkey"
       unless $pubkey;
+
+    _check_key( 'MAIN_KEY', $pubkey );
 
     my $server = $use_ssl ? API_SECURE_SERVER : API_SERVER;
 
@@ -94,6 +209,7 @@ sub get_html {
 
     return join(
         '',
+        $self->get_options_setter( $options ),
         _open_tag(
             'script',
             {
@@ -147,6 +263,8 @@ sub check_answer {
       "To use reCAPTCHA you must get an API key from http://recaptcha.net/api/getkey"
       unless $privkey;
 
+    _check_key( 'MAIN_KEY', $privkey );
+
     croak "For security reasons, you must pass the remote ip to reCAPTCHA"
       unless $remoteip;
 
@@ -169,14 +287,12 @@ sub check_answer {
             return { is_valid => 1 };
         }
         else {
+            chomp $message;
             return { is_valid => 0, error => $message };
         }
     }
     else {
-
-        # TODO: Find out whether there's a proper code for a
-        # server error.
-        return { is_valid => 0, error => 'server-error' };
+        return { is_valid => 0, error => SERVER_ERROR };
     }
 }
 
@@ -198,7 +314,7 @@ sub _aes_encrypt {
 
 sub _urlbase64 {
     my $str = shift;
-    chomp (my $enc = encode_base64( $str ));
+    chomp( my $enc = encode_base64( $str ) );
     $enc =~ tr{+/}{-_};
     return $enc;
 }
@@ -210,6 +326,12 @@ sub mailhide_url {
     croak "To use reCAPTCHA Mailhide, you have to sign up for a public and "
       . "private key, you can do so at http://mailhide.recaptcha.net/apikey"
       unless $pubkey && $privkey;
+
+    _check_key( 'MAILHIDE_PUBLIC',  $pubkey );
+    _check_key( 'MAILHIDE_PRIVATE', $privkey );
+
+    croak "You must supply an email address"
+      unless $email;
 
     return API_MAILHIDE_SERVER . '/d?'
       . _encode_query(
@@ -230,10 +352,10 @@ sub mailhide_html {
     my $self = shift;
     my ( $pubkey, $privkey, $email ) = @_;
 
-    my ( $user, $dom ) = _email_parts( $email );
     my $url = $self->mailhide_url( $pubkey, $privkey, $email );
+    my ( $user, $dom ) = _email_parts( $email );
 
-    my %window_style = (
+    my %window_options = (
         toolbar    => 0,
         scrollbars => 0,
         location   => 0,
@@ -244,8 +366,8 @@ sub mailhide_html {
         height     => 300
     );
 
-    my $style = join ',',
-      map { "$_=$window_style{$_}" } sort keys %window_style;
+    my $options = join ',',
+      map { "$_=$window_options{$_}" } sort keys %window_options;
 
     return join(
         '',
@@ -254,7 +376,7 @@ sub mailhide_html {
             'a',
             {
                 href    => $url,
-                onclick => "window.open('$url', '', '$style'); return false;",
+                onclick => "window.open('$url', '', '$options'); return false;",
                 title   => 'Reveal this e-mail address'
             }
         ),
@@ -274,7 +396,7 @@ Captcha::reCAPTCHA - A Perl implementation of the reCAPTCHA API
 
 =head1 VERSION
 
-This document describes Captcha::reCAPTCHA version 0.4
+This document describes Captcha::reCAPTCHA version 0.5
 
 =head1 SYNOPSIS
 
@@ -338,7 +460,7 @@ L<https://admin.recaptcha.net/recaptcha/createsite/>
 
 =over
 
-=item C<< get_html( $pubkey, $error, $use_ssl ) >>
+=item C<< get_html( $pubkey, $error, $use_ssl, $options ) >>
 
 Generates HTML to display the captcha.
 
@@ -361,10 +483,39 @@ Optional. Should the SSL-based API be used? If you are displaying a page
 to the user over SSL, be sure to set this to true so an error dialog
 doesn't come up in the user's browser.
 
+=item C<< $options >>
+
+Optional. A reference to a hash of options for the captcha. See 
+C<< get_options_setter >> for more details.
+
 =back
 
 Returns a string containing the HTML that should be used to display
 the captcha.
+
+=item C<< get_options_setter( $options ) >>
+
+You can optionally customize the look of the reCAPTCHA widget with some
+JavaScript settings. C<get_options_setter> returns a block of Javascript
+wrapped in <script> .. </script> tags that will set the options to be used
+by the widget.
+
+C<$options> is a reference to a hash that may contain the following keys:
+
+=over
+
+=item C<theme>
+
+Defines which theme to use for reCAPTCHA. Possible values are 'red',
+'white' or 'blackglass'. The default is 'red'.
+
+=item C<tabindex>
+
+Sets a tabindex for the reCAPTCHA text box. If other elements in the
+form use a tabindex, this should be set so that navigation is easier for
+the user. Default: 0.
+
+=back
 
 =item C<< check_answer >>
 
@@ -484,6 +635,8 @@ L<http://mailhide.recaptcha.net/apikey>
 =head1 DEPENDENCIES
 
 LWP::UserAgent
+Crypt::Rijndael
+MIME::Base64
 
 =head1 INCOMPATIBILITIES
 

@@ -11,4 +11,10 @@ Revision history for Captcha-reCAPTCHA
 
 0.4 2007-05-26
     Made LWP::UserAgent creation lazy
-    
+    Added Mailhide support
+
+0.5 2007-05-27
+    Added better validation for keys to provide helpful diagnostics in
+    the case where the wrong key is used.
+    Improved test coverage.
+    Added support for generation of RecaptchaOptions options hash.

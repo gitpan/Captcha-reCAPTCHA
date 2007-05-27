@@ -3,26 +3,40 @@ use warnings;
 use Test::More;
 use HTTP::Response;
 use Captcha::reCAPTCHA;
+use Data::Dumper;
 
 my @schedule;
-my $PRIVKEY;
+use constant PRIVKEY => '6LdAAAkAwAAAix_GF6AMQnw5UCG3JjWluQJMNGjY';
 
 BEGIN {
 
     # Looks real. Isn't.
-    $PRIVKEY  = '6LdAAAkAwAAAix_GF6AMQnw5UCG3JjWluQJMNGjY';
     @schedule = (
         {
             name => 'Simple',
-            args =>
-              [ $PRIVKEY, '192.168.0.1', '..challenge..', '..response..' ],
+            args => [ PRIVKEY, '192.168.0.1', '..challenge..', '..response..' ],
+            response   => "true\n",
             check_args => {
-                privatekey => $PRIVKEY,
+                privatekey => PRIVKEY,
                 remoteip   => '192.168.0.1',
                 challenge  => '..challenge..',
                 response   => '..response..'
             },
-            check_url => 'http://api-verify.recaptcha.net/verify'
+            check_url => 'http://api-verify.recaptcha.net/verify',
+            expect    => { is_valid => 1 },
+        },
+        {
+            name => 'Simple',
+            args => [ PRIVKEY, '192.168.0.1', '..challenge..', '..response..' ],
+            response   => "false\nincorrect-challenge-sol\n",
+            check_args => {
+                privatekey => PRIVKEY,
+                remoteip   => '192.168.0.1',
+                challenge  => '..challenge..',
+                response   => '..response..'
+            },
+            check_url => 'http://api-verify.recaptcha.net/verify',
+            expect => { is_valid => 0, error => 'incorrect-challenge-sol' },
         },
     );
     plan tests => 6 * @schedule;
@@ -32,6 +46,12 @@ package T::Captcha::reCAPTCHA;
 
 our @ISA = qw(Captcha::reCAPTCHA);
 use Captcha::reCAPTCHA;
+
+sub set_response {
+    my $self     = shift;
+    my $response = shift;
+    $self->{t_response} = $response;
+}
 
 sub _post_request {
     my $self = shift;
@@ -43,7 +63,7 @@ sub _post_request {
     $self->{t_args} = $args;
 
     return HTTP::Response->new( 200, 'OK', [ 'Content-type:' => 'text/plain' ],
-        "true\n" );
+        $self->{t_response} );
 }
 
 sub get_url  { shift->{t_url} }
@@ -55,8 +75,13 @@ for my $test ( @schedule ) {
     my $name = $test->{name};
     ok my $captcha = T::Captcha::reCAPTCHA->new(), "$name: Created OK";
     isa_ok $captcha, 'Captcha::reCAPTCHA';
-    ok my $resp = $captcha->check_answer( @{ $test->{args} } ), "$name: got response";
-    is $captcha->get_url, $test->{check_url}, "$name: URL OK";
+    $captcha->set_response( $test->{response} );
+    ok my $resp = $captcha->check_answer( @{ $test->{args} } ),
+      "$name: got response";
+    is $captcha->get_url,         $test->{check_url},  "$name: URL OK";
     is_deeply $captcha->get_args, $test->{check_args}, "$name: args OK";
-    is_deeply $resp, { is_valid => 1 }, "$name: result OK";
+    unless ( is_deeply $resp, $test->{expect}, "$name: result OK" ) {
+        diag( Data::Dumper->Dump( [ $test->{expect} ], ['$expected'] ) );
+        diag( Data::Dumper->Dump( [$resp],             ['$got'] ) );
+    }
 }
