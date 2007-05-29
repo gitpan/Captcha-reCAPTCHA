@@ -18,3 +18,7 @@ Revision history for Captcha-reCAPTCHA
     the case where the wrong key is used.
     Improved test coverage.
     Added support for generation of RecaptchaOptions options hash.
+
+0.6 2007-05-29
+    Remove key validation code: keys may change format in the future.
+    Switched server error code to 'recaptcha-not-reachable'

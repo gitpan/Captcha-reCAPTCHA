@@ -5,15 +5,17 @@ use HTTP::Response;
 use Captcha::reCAPTCHA;
 use Data::Dumper;
 
-my @schedule;
+# Looks real. Isn't.
 use constant PRIVKEY => '6LdAAAkAwAAAix_GF6AMQnw5UCG3JjWluQJMNGjY';
+
+my @schedule;
 
 BEGIN {
 
     # Looks real. Isn't.
     @schedule = (
         {
-            name => 'Simple',
+            name => 'Simple correct',
             args => [ PRIVKEY, '192.168.0.1', '..challenge..', '..response..' ],
             response   => "true\n",
             check_args => {
@@ -26,7 +28,7 @@ BEGIN {
             expect    => { is_valid => 1 },
         },
         {
-            name => 'Simple',
+            name => 'Simple incorrect',
             args => [ PRIVKEY, '192.168.0.1', '..challenge..', '..response..' ],
             response   => "false\nincorrect-challenge-sol\n",
             check_args => {

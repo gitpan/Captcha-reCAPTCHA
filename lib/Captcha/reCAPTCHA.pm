@@ -7,7 +7,7 @@ use LWP::UserAgent;
 use Crypt::Rijndael;
 use MIME::Base64;
 
-use version; our $VERSION = qv( '0.5' );
+use version; our $VERSION = qv( '0.6' );
 
 use constant API_SERVER          => 'http://api.recaptcha.net';
 use constant API_SECURE_SERVER   => 'https://api-secure.recaptcha.net';
@@ -15,25 +15,7 @@ use constant API_VERIFY_SERVER   => 'http://api-verify.recaptcha.net';
 use constant API_MAILHIDE_SERVER => 'http://mailhide.recaptcha.net';
 
 # TODO: Find out whether there's a proper code for a server error.
-use constant SERVER_ERROR => 'server-error';
-
-# Validation rules for keys - used to produce better diagnostics in the
-# case where people use the wrong key
-
-my %VALID_KEY = (
-    MAIN_KEY => {
-        match => qr/^ [A-Z0-9_-]{40} $/xi,
-        desc  => 'reCAPCTHA key'
-    },
-    MAILHIDE_PUBLIC => {
-        match => qr/^ [A-Z0-9_-]{24} == $/xi,
-        desc  => 'Mailhide public key'
-    },
-    MAILHIDE_PRIVATE => {
-        match => qr/^ [A-F0-9]{32} $/xi,
-        desc  => 'Mailhide private key'
-    }
-);
+use constant SERVER_ERROR => 'recaptcha-not-reachable';
 
 my %ENT_MAP = (
     '&' => '&amp;',
@@ -46,6 +28,8 @@ my %ENT_MAP = (
 my %JSON_ESCAPE = (
     '"'  => '\"',
     "\n" => '\n',
+    "\t" => '\t',
+    "\r" => '\r',
 );
 
 sub _hash_re {
@@ -72,32 +56,10 @@ sub _initialize {
       unless 'HASH' eq ref $args;
 }
 
-sub _guess_key_type {
-    my $key = shift;
-    for my $kt ( keys %VALID_KEY ) {
-        my $kd = $VALID_KEY{$kt};
-        return ( $kt, $kd->{desc} )
-          if $key =~ $kd->{match};
-    }
-    return;
-}
-
+# Key validation hook. Currently unused
 sub _check_key {
     my ( $type, $key ) = @_;
-    my $kd = $VALID_KEY{$type} || croak "Invalid key type: $type";
-    return $key if $key =~ $kd->{match};
-    if ( my ( $guess, $desc ) = _guess_key_type( $key ) ) {
-        croak "Expected a "
-          . $kd->{desc}
-          . ". The supplied key looks like a "
-          . $desc;
-    }
-    else {
-        croak "Expected a "
-          . $kd->{desc}
-          . ". The supplied key should match "
-          . $kd->{match};
-    }
+    return $key;
 }
 
 # Get a UA singleton
@@ -214,7 +176,7 @@ sub get_html {
             'script',
             {
                 type => 'text/javascript',
-                src  => "$server/challenge?$qs"
+                src  => "$server/challenge?$qs",
             }
         ),
         _close_tag( 'script' ),
@@ -244,7 +206,8 @@ sub get_html {
             },
             1
         ),
-        _close_tag( 'noscript' )
+        _close_tag( 'noscript' ),
+        "\n"
     );
 }
 
@@ -324,7 +287,7 @@ sub mailhide_url {
     my ( $pubkey, $privkey, $email ) = @_;
 
     croak "To use reCAPTCHA Mailhide, you have to sign up for a public and "
-      . "private key, you can do so at http://mailhide.recaptcha.net/apikey"
+      . "private key. You can do so at http://mailhide.recaptcha.net/apikey."
       unless $pubkey && $privkey;
 
     _check_key( 'MAILHIDE_PUBLIC',  $pubkey );
@@ -345,7 +308,8 @@ sub mailhide_url {
 sub _email_parts {
     my ( $user, $dom ) = split( /\@/, shift, 2 );
     my $ul = length( $user );
-    return ( substr( $user, 0, $ul <= 4 ? 1 : $ul <= 6 ? 3 : 4 ), $dom );
+    return ( substr( $user, 0, $ul <= 4 ? 1 : $ul <= 6 ? 3 : 4 ), '...', '@',
+        $dom );
 }
 
 sub mailhide_html {
@@ -353,7 +317,7 @@ sub mailhide_html {
     my ( $pubkey, $privkey, $email ) = @_;
 
     my $url = $self->mailhide_url( $pubkey, $privkey, $email );
-    my ( $user, $dom ) = _email_parts( $email );
+    my ( $user, $dots, $at, $dom ) = _email_parts( $email );
 
     my %window_options = (
         toolbar    => 0,
@@ -380,9 +344,9 @@ sub mailhide_html {
                 title   => 'Reveal this e-mail address'
             }
         ),
-        '...',
+        $dots,
         _close_tag( 'a' ),
-        '@',
+        $at,
         _encode_entity( $dom )
     );
 }
@@ -396,7 +360,7 @@ Captcha::reCAPTCHA - A Perl implementation of the reCAPTCHA API
 
 =head1 VERSION
 
-This document describes Captcha::reCAPTCHA version 0.5
+This document describes Captcha::reCAPTCHA version 0.6
 
 =head1 SYNOPSIS
 
@@ -634,9 +598,9 @@ L<http://mailhide.recaptcha.net/apikey>
 
 =head1 DEPENDENCIES
 
-LWP::UserAgent
-Crypt::Rijndael
-MIME::Base64
+LWP::UserAgent,
+Crypt::Rijndael,
+MIME::Base64,
 
 =head1 INCOMPATIBILITIES
 

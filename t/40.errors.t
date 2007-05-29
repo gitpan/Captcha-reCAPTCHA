@@ -36,57 +36,12 @@ BEGIN {
             expect => qr/To use reCAPTCHA you must get an API key from/
         },
         {
-            name => 'get_html: Garbage key',
-            try  => sub {
-                my $c = shift;
-                $c->get_html( 'splibble' );
-            },
-            expect =>
-              qr/Expected a reCAPCTHA key. The supplied key should match/
-        },
-        {
-            name => 'get_html: MH_PUBKEY',
-            try  => sub {
-                my $c = shift;
-                $c->get_html( MH_PUBKEY );
-            },
-            expect =>
-              qr/Expected a reCAPCTHA key. The supplied key looks like a Mailhide public key/
-        },
-        {
-            name => 'get_html: MH_PRIVKEY',
-            try  => sub {
-                my $c = shift;
-                $c->get_html( MH_PRIVKEY );
-            },
-            expect =>
-              qr/Expected a reCAPCTHA key. The supplied key looks like a Mailhide private key/
-        },
-        {
             name => 'check_answer: No args',
             try  => sub {
                 my $c = shift;
                 $c->check_answer();
             },
             expect => qr/To use reCAPTCHA you must get an API key from/
-        },
-        {
-            name => 'check_answer: MH_PUBKEY',
-            try  => sub {
-                my $c = shift;
-                $c->check_answer( MH_PUBKEY );
-            },
-            expect =>
-              qr/Expected a reCAPCTHA key. The supplied key looks like a Mailhide public key/
-        },
-        {
-            name => 'check_answer: MH_PRIVKEY',
-            try  => sub {
-                my $c = shift;
-                $c->check_answer( MH_PRIVKEY );
-            },
-            expect =>
-              qr/Expected a reCAPCTHA key. The supplied key looks like a Mailhide private key/
         },
         {
             name => 'check_answer: no ip',
@@ -103,24 +58,6 @@ BEGIN {
                 $c->mailhide_html();
             },
             expect => qr/you have to sign up for a public and private key/
-        },
-        {
-            name => 'mailhide_html: Main keys',
-            try  => sub {
-                my $c = shift;
-                $c->mailhide_html( PUBKEY, MH_PRIVKEY, 'someone@example.com' );
-            },
-            expect =>
-              qr/Expected a Mailhide public key. The supplied key looks like a reCAPCTHA key/
-        },
-        {
-            name => 'mailhide_html: Main keys 2',
-            try  => sub {
-                my $c = shift;
-                $c->mailhide_html( MH_PUBKEY, PRIVKEY, 'someone@example.com' );
-            },
-            expect =>
-              qr/Expected a Mailhide private key. The supplied key looks like a reCAPCTHA key/
         },
         {
             name => 'mailhide_html: No email',

@@ -3,15 +3,16 @@ use warnings;
 use Test::More tests => 3;
 use Captcha::reCAPTCHA;
 
-my $PUBKEY  = 'UcV0oq5XNVM01AyYmMNRqvRA==';
-my $PRIVKEY = 'E542D5DB870FF2D2B9D01070FF04F0C8';
+use constant PUBKEY  => 'UcV0oq5XNVM01AyYmMNRqvRA==';
+use constant PRIVKEY => 'E542D5DB870FF2D2B9D01070FF04F0C8';
 
 ok my $captcha = Captcha::reCAPTCHA->new, "create ok";
-my $mh_url = $captcha->mailhide_url( $PUBKEY, $PRIVKEY, 'someone@example.com' );
+
+my $mh_url = $captcha->mailhide_url( PUBKEY, PRIVKEY, 'someone@example.com' );
 is $mh_url, 'http://mailhide.recaptcha.net/d?c=4jBBJ29mAjTuEk81neCXmYlMeLR6'
   . 'FAqNTe_fq72Tkq4%3d&k=UcV0oq5XNVM01AyYmMNRqvRA%3d%3d', 'url OK';
-my $mh_html
-  = $captcha->mailhide_html( $PUBKEY, $PRIVKEY, 'someone@example.com' );
+
+my $mh_html = $captcha->mailhide_html( PUBKEY, PRIVKEY, 'someone@example.com' );
 is $mh_html,
   'some<a href="http://mailhide.recaptcha.net/d?c=4jBBJ29mAjTuEk'
   . '81neCXmYlMeLR6FAqNTe_fq72Tkq4%3d&amp;k=UcV0oq5XNVM01AyYmMNR'
