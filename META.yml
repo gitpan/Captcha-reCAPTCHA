@@ -1,12 +1,13 @@
 --- #YAML:1.0
 name:                Captcha-reCAPTCHA
-version:             v0.6
+version:             v0.7
 abstract:            A Perl implementation of the reCAPTCHA API
 license:             perl
 generated_by:        ExtUtils::MakeMaker version 6.32
 distribution_type:   module
 requires:     
     Crypt::Rijndael:               0
+    HTML::Tiny:                    v0.5
     LWP::UserAgent:                0
     MIME::Base64:                  0
     Test::More:                    0
