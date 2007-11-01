@@ -30,3 +30,8 @@ Revision history for Captcha-reCAPTCHA
 0.8 2007-11-01
     s/incorrect-challenge-sol/incorrect-captcha-sol/g #29693
     Thanks to William Campbell for finding it.
+
+0.9 2007-11-01
+    Code unchanged. Version bump because I packaged the last version
+    with Leopard's tar - which likes to add Apple specific extended
+    attrs. Grrr.
