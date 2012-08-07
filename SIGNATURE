@@ -1,5 +1,5 @@
 This file contains message digests of all files listed in MANIFEST,
-signed via the Module::Signature module, version 0.64.
+signed via the Module::Signature module, version 0.68.
 
 To verify the content in this distribution, first make sure you have
 Module::Signature installed, then type:
@@ -14,13 +14,14 @@ not run its Makefile.PL or Build.PL.
 -----BEGIN PGP SIGNED MESSAGE-----
 Hash: SHA1
 
-SHA1 9be42ea49f30d62235ff86789df20a42bdb9fab0 Changes
-SHA1 e2ed71890f1f07d86b1e877bd6b33a856cf0ef4c MANIFEST
-SHA1 b2c7153f65c4d5bd2e898381a86ea5eeeae3bc5e META.yml
+SHA1 fbd289a302f12a9538a024f14edef4a5c9f88eb6 Changes
+SHA1 1f363e33489a19797f1c090eb00ee527ce74f467 MANIFEST
+SHA1 12cd3a77f02ec89c1e2b6e71660f4b5706fbde55 META.json
+SHA1 9b38c263a078dba1cd22ac1cb3275524adb95c64 META.yml
 SHA1 334033f6e4a65e1d87f8e07d810416b7dad3457d Makefile.PL
 SHA1 51f95b312f1ec74f565588a929c5acb7fbbe0605 README
 SHA1 8698ba348a5fa7cb01cc99eda007d3500e45706c examples/captcha.pl
-SHA1 e0cd4fddaf7e5b27bb808bc61b130c0b5792bda2 lib/Captcha/reCAPTCHA.pm
+SHA1 28669b9065f3bc5fc0e7a8fd8fceb9c727cea45e lib/Captcha/reCAPTCHA.pm
 SHA1 9f9bc14f8a6332889679c48a8c697a7fcea55a8a t/00.load.t
 SHA1 e4246491168fad2823ea2f199a42377d63454da5 t/10.get_html.t
 SHA1 ccbe936829f91b67c3b10d239d9108b88cc6aa37 t/20.check_answer.t
@@ -28,9 +29,13 @@ SHA1 4d63f3b02bd00e1b7ad062c4f7f384bb71f6112a t/40.errors.t
 SHA1 aeaa691851a425f07ab6a8d4f825e2ad9d92b8ee t/pod-coverage.t
 SHA1 0190346d7072d458c8a10a45c19f86db641dcc48 t/pod.t
 -----BEGIN PGP SIGNATURE-----
-Version: GnuPG v1.4.10 (Darwin)
+Version: GnuPG/MacGPG2 v2.0.18 (Darwin)
 
-iEYEARECAAYFAkwvP6EACgkQwoknRJZQnCE2fwCcDz49vWj+QZGhnd1GEyGGzNb2
-bXwAnjNS1hyHktvrqbm2I9ZshdxC3ERg
-=3LxA
+iQEcBAEBAgAGBQJQIJz+AAoJENYkdgqz5djjcQUIAJZLHON2pjI4YsjPntAD/zj8
+9gyOrZ20tRs094YCQoel3VUviveCJIMJbHnoKMhiEdIZBG47Mli4qN61bMGrd6Rj
+oiOyvva8CAJ4QqU6v5wWsRnm94aL8nuuMVf4sEVqwh5716BqNfTj0LYm8tUj0+MT
+wICv1ZwfT+ivNvZoULpQyCsUdImaWKjOBAmb1RgAF1LV6wdMP0+uVyU9CB9/SDak
+Z4gt3/AYvGDuDFg1t4lPtGo13NigaLHIO12IWpP37Jbl9ytnigcj++3Nz0cst0uc
+OTwcKEnFI0psej2cr5nKHbXQW+LTml85IwmtiSORbe/vJAepL9ehY5VmIqWmQJc=
+=YdTV
 -----END PGP SIGNATURE-----
