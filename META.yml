@@ -21,4 +21,4 @@ requires:
   HTML::Tiny: 0.904
   LWP::UserAgent: 0
   Test::More: 0
-version: 0.95
+version: 0.96
